@@ -29,9 +29,9 @@ End;
 // 计算哪些板块涨幅大的个股数量多
 Function selectBestBks(beginDate, arrBk);
 Begin
+    setsysparam(pn_date(),inttodate(beginDate));
     bkNum := length(arrBk);
-    //for i := 0 to bkNum - 1 do
-    for i := 0 to 0 do
+    for i := 0 to bkNum - 1 do
     begin
         bkInfo := arrBk[i];
         stocks := bkInfo['stocks'];
@@ -51,7 +51,6 @@ Begin
                 continue;
 
             setsysparam(pn_stock(),stkCode);
-            setsysparam(pn_date(),inttodate(beginDate));
             stkClose := close();
             stkClose3 := ref(close(), 3);
             echo 'stkName = ', stkName, ' stockCode = ', stkCode, ' stkClose = ', stkClose, ' stkClose3 = ', stkClose3;
