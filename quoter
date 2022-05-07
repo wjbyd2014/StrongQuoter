@@ -58,7 +58,7 @@ Begin
             if stkCode[1:2] = '68' or stkCode[1] = '3' then
                 incRate := 1.3;
 
-            if stkClose >= stkClose3 * incRate then
+            if stkClose3 > 0 and stkClose >= stkClose3 * incRate then
                 arrBk[i]['强势股票数'] += 1;
         end
     end
