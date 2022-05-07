@@ -13,14 +13,14 @@ Begin
     // 解析板块文件，获取板块类型，板块名，股票列表
     arrBk := parseFile(bkFileList, fileNum);
     
-    //setsysparam(pn_rate(),1);
-    //setsysparam(pn_rateday(),-1);
-    
     // 计算强势板块
-    bestBks := selectBestBks(beginDate, arrBk);
+    selectBestBks(beginDate, out arrBk);
+    
+    // 按强势股票数排序
+    sortTableByField(arrBk, '强势股票数', 0);
     
     // 计算强势个股
-    bestStocks := selectBestStocks(beginDate, bestBks);
+    bestStocks := selectBestStocks(beginDate, arrBk, topNum);
     
     // 存盘
     store(bestStocks);
@@ -33,11 +33,11 @@ Begin
     bkNum := length(arrBk);
     for i := 0 to bkNum - 1 do
     begin
+        arrBk[i]['强势股票数'] := 0;
         bkInfo := arrBk[i];
         stocks := bkInfo['stocks'];
         stockNum := length(stocks);
         
-        echo bkInfo['bkType'], ' ', bkInfo['bkName'];
         for j := 0 to stockNum - 1 do
         begin
             if not stocks[j] then
@@ -53,13 +53,19 @@ Begin
             setsysparam(pn_stock(),stkCode);
             stkClose := close();
             stkClose3 := ref(close(), 3);
-            echo 'stkName = ', stkName, ' stockCode = ', stkCode, ' stkClose = ', stkClose, ' stkClose3 = ', stkClose3;
+            
+            incRate := 1.2;
+            if stkCode[1:2] = '68' or stkCode[1] = '3' then
+                incRate := 1.3;
+
+            if stkClose >= stkClose3 * incRate then
+                arrBk[i]['强势股票数'] += 1;
         end
     end
 End;
 
 // 计算单个板块中的强势个股
-Function selectBestStocks(beginDate, bestBks);
+Function selectBestStocks(beginDate, arrBk, topNum);
 Begin
 End;
 
