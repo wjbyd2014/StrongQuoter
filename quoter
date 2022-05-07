@@ -1,0 +1,105 @@
+Function countStock2(beginDate,path,topNum);
+Begin
+    if not path then
+        return '非法路径';
+
+    // 获取板块信息文件，计算板块总数
+    bkFileList := iterDir(path);
+    fileNum := length(bkFileList);
+
+    if fileNum = 0 then
+       return path + '中没有发现任何stock文件';
+
+    // 解析板块文件，获取板块类型，板块名，股票列表
+    arrBk := parseFile(bkFileList, fileNum);
+    
+    //setsysparam(pn_rate(),1);
+    //setsysparam(pn_rateday(),-1);
+    
+    // 计算强势板块
+    bestBks := selectBestBks(beginDate, arrBk);
+    
+    // 计算强势个股
+    bestStocks := selectBestStocks(beginDate, bestBks);
+    
+    // 存盘
+    store(bestStocks);
+End;
+
+// 计算哪些板块涨幅大的个股数量多
+Function selectBestBks(beginDate, arrBk);
+Begin
+    bkNum := length(arrBk);
+    //for i := 0 to bkNum - 1 do
+    for i := 0 to 0 do
+    begin
+        bkInfo := arrBk[i];
+        stocks := bkInfo['stocks'];
+        stockNum := length(stocks);
+        
+        echo bkInfo['bkType'], ' ', bkInfo['bkName'];
+        for j := 0 to stockNum - 1 do
+        begin
+            if not stocks[j] then
+                continue;
+                
+            stock := str2array(stocks[j], ":");
+            stkName := stock[0];
+            stkCode := stock[1];
+
+            if stkName[1:2] = 'ST' or stkName[2:3] = 'ST' then
+                continue;
+
+            setsysparam(pn_stock(),stkCode);
+            setsysparam(pn_date(),inttodate(beginDate));
+            stkClose := close();
+            stkClose3 := ref(close(), 3);
+            echo 'stkName = ', stkName, ' stockCode = ', stkCode, ' stkClose = ', stkClose, ' stkClose3 = ', stkClose3;
+        end
+    end
+End;
+
+// 计算单个板块中的强势个股
+Function selectBestStocks(beginDate, bestBks);
+Begin
+End;
+
+// 遍历目录中的stock文件
+Function iterDir(dirPath);
+Begin
+    arrFiles := rdo2 filelist("", dirPath + '\\*.stock');
+    result := array();
+    for i := 0 to length(arrFiles) - 1 do
+    begin
+        result[i] := dirPath + '\\' + arrFiles[i]['FileName'];
+    end
+    return result;
+End;
+
+Function parseFile(stockFileList, fileNum);
+begin
+    retArray := array();
+    for i := 0 to fileNum - 1 do
+    begin
+        fileName := str2array(stockFileList[i], '\\')[3];
+        arr := str2array(fileName, '.');
+        bkType := arr[0];
+        bkName := arr[1];
+
+        size := rdo2 filesize("", stockFileList[i]);
+        retRead := rdo2 readFile(rwraw(), "", stockFileList[i], 0, size, data);
+        if not retRead then
+            return;
+
+        if not data then
+           return;
+
+        stocks := str2array(data, ";");
+        retArray[i] := array('bkType':bkType, 'bkName':bkName, 'stocks': stocks);
+    end
+    return retArray;
+End;
+
+Function store(bestStocks);
+begin
+end;
