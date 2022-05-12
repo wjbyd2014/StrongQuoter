@@ -19,11 +19,12 @@ Begin
     // 按强势股票数排序
     sortTableByField(arrBk, '强势股票数', 0);
     
+    storeBestBk(arrBk);
+    
     // 计算强势个股
     bestStocks := selectBestStocks(beginDate, arrBk, topNum);
-    
-    // 存盘
-    store(bestStocks);
+
+    storeStock(bestStocks);
 End;
 
 // 计算哪些板块涨幅大的个股数量多
@@ -34,9 +35,13 @@ Begin
     for i := 0 to bkNum - 1 do
     begin
         arrBk[i]['强势股票数'] := 0;
+        arrbk[i]['index'] := i;
         bkInfo := arrBk[i];
         stocks := bkInfo['stocks'];
         stockNum := length(stocks);
+
+        if arrBk[i]['bkName'] like '^昨日' then
+            continue;
         
         for j := 0 to stockNum - 1 do
         begin
@@ -93,11 +98,8 @@ begin
 
         size := rdo2 filesize("", stockFileList[i]);
         retRead := rdo2 readFile(rwraw(), "", stockFileList[i], 0, size, data);
-        if not retRead then
-            return;
-
-        if not data then
-           return;
+        if not retRead or not data then
+            continue;
 
         stocks := str2array(data, ";");
         retArray[i] := array('bkType':bkType, 'bkName':bkName, 'stocks': stocks);
@@ -105,6 +107,14 @@ begin
     return retArray;
 End;
 
-Function store(bestStocks);
+Function storeBestBk(arrBk);
+begin
+    arrBk2 := arrBk;
+    DeleteColumnByField(arrBk2, 'index');
+    fileName := 'D:\\强势板块.xls';
+    rdo2 exportfile(ftxls(), "", fileName, arrBk2);
+end;
+
+Function storeStock(bestStocks);
 begin
 end;
