@@ -1,4 +1,4 @@
-Function countStock2(beginDate,path,topNum);
+Function countStock2(path,topNum,beginDate);
 Begin
     if not path then
         return '非法路径';
@@ -13,12 +13,14 @@ Begin
     // 解析板块文件，获取板块类型，板块名，股票列表
     arrBk := parseFile(bkFileList, fileNum);
     
+    setsysparam(pn_date(),inttodate(beginDate));
+
     // 计算强势板块
     selectBestBks(beginDate, out arrBk);
     
     // 按强势股票数排序
-    sortTableByField(arrBk, '强势股票数', 0);
-    
+    sortTableByField(arrBk, '强势股票数（三日涨幅主板 > 20%，科创板/创业板 > 30%）', 0);
+
     storeBestBk(arrBk);
     
     // 计算强势个股
@@ -30,18 +32,15 @@ End;
 // 计算哪些板块涨幅大的个股数量多
 Function selectBestBks(beginDate, arrBk);
 Begin
-    setsysparam(pn_date(),inttodate(beginDate));
     bkNum := length(arrBk);
     for i := 0 to bkNum - 1 do
     begin
-        arrBk[i]['强势股票数'] := 0;
+        arrBk[i]['强势股票数（三日涨幅主板 > 20%，科创板/创业板 > 30%）'] := 0;
+        arrBk[i]['股票总数'] := 0;
         arrbk[i]['index'] := i;
         bkInfo := arrBk[i];
         stocks := bkInfo['stocks'];
         stockNum := length(stocks);
-
-        if arrBk[i]['bkName'] like '^昨日' then
-            continue;
         
         for j := 0 to stockNum - 1 do
         begin
@@ -55,6 +54,7 @@ Begin
             if stkName[1:2] = 'ST' or stkName[2:3] = 'ST' then
                 continue;
 
+            arrBk[i]['股票总数'] += 1;
             setsysparam(pn_stock(),stkCode);
             stkClose := close();
             stkClose3 := ref(close(), 3);
@@ -64,14 +64,73 @@ Begin
                 incRate := 1.3;
 
             if stkClose3 > 0 and stkClose >= stkClose3 * incRate then
-                arrBk[i]['强势股票数'] += 1;
+                arrBk[i]['强势股票数（三日涨幅主板 > 20%，科创板/创业板 > 30%）'] += 1;
         end
+        
+        arrBk[i]['强势股票占比'] := 0;
+        if arrBk[i]['股票总数'] > 0 then
+           arrBk[i]['强势股票占比'] := arrBk[i]['强势股票数（三日涨幅主板 > 20%，科创板/创业板 > 30%）'] / arrBk[i]['股票总数'];
     end
 End;
 
 // 计算单个板块中的强势个股
 Function selectBestStocks(beginDate, arrBk, topNum);
 Begin
+    ret := array();
+    bkNum := length(arrBk);
+    for i := 0 to topNum - 1 do
+    begin
+        bkInfo := arrBk[i];
+        stocks := bkInfo['stocks'];
+        stockNum := length(stocks);
+
+        for j := 0 to stockNum - 1 do
+        begin
+            if not stocks[j] then
+                continue;
+
+            stock := str2array(stocks[j], ":");
+            stkName := stock[0];
+            stkCode := stock[1];
+
+            if stkName[1:2] = 'ST' or stkName[2:3] = 'ST' then
+                continue;
+
+            avg_amount := spec(ma(amount(),3), stkCode);
+            if avg_amount < 300000000 then
+                continue;
+
+            close1 := spec(close(), stkCode);
+            close2 := 0;
+            avg := 0;
+            d := '';
+            k := 0;
+            
+            while True do
+            begin
+                var1 := spec(ref(close(), k), stkCode);
+                
+                // 该股票当日还未上市
+                if var1 = 0 then
+                    break;
+                    
+                var2 := spec(ref(ma(close(),5), k), stkCode);
+                
+                if var1 < var2 then
+                begin
+                    close2 := var1;
+                    d := DateToStr((StockEndTPrevNDay(inttodate(beginDate), k)));
+                    avg := var2;
+                    break;
+                end
+                    
+                k += 1;
+            end
+            ret[length(ret)] := array('stock':stkName+'('+stkCode+')', '收盘价':close1, '最近一次低于5日均线的收盘价': close2,
+                '最近一次低于5日均线的日期':d, '涨幅':(close1-close2)/close1);
+        end
+    end
+    return ret;
 End;
 
 // 遍历目录中的stock文件
@@ -111,6 +170,7 @@ Function storeBestBk(arrBk);
 begin
     arrBk2 := arrBk;
     DeleteColumnByField(arrBk2, 'index');
+    DeleteColumnByField(arrBk2, 'stocks');
     fileName := 'D:\\强势板块.xls';
     rdo2 exportfile(ftxls(), "", fileName, arrBk2);
 end;
