@@ -27,7 +27,7 @@ Begin
     bestStocks := selectBestStocks(beginDate, arrBk, topNum);
     
     // 按涨幅排序
-    sortTableByField(bestStocks, '涨幅', 0);
+    sortTableByField(bestStocks, '截至今日总涨幅', 0);
     
     bestStocks := select distinct * from bestStocks end;
 
@@ -108,7 +108,7 @@ Begin
             close1 := spec(close(), stkCode);
             close2 := 0;
             avg := 0;
-            d := '';
+            date_ := '';
             k := 0;
             
             while True do
@@ -124,15 +124,15 @@ Begin
                 if var1 < var2 then
                 begin
                     close2 := var1;
-                    d := DateToStr((StockEndTPrevNDay(inttodate(beginDate), k)));
+                    date_ := DateToStr((StockEndTPrevNDay(inttodate(beginDate), k)));
                     avg := var2;
                     break;
                 end
                     
                 k += 1;
             end
-            ret[length(ret)] := array('stock':stkName+'('+stkCode+')', '收盘价':close1, '最近一次低于5日均线的收盘价': close2,
-                '最近一次低于5日均线的日期':d, '涨幅':(close1-close2)/close1);
+            ret[length(ret)] := array('股票名称':stkName+'('+stkCode+')', '今日收盘价':close1, '最近一次低于5日均线的收盘价': close2,
+                '最近一次低于5日均线的日期':date_, '截至今日总涨幅':(close1-close2)/close2, '3日平均成交额（万元）':avg_amount/10000);
         end
     end
     return ret;
@@ -182,4 +182,6 @@ end;
 
 Function storeStock(bestStocks);
 begin
+    fileName := 'D:\\强势股票.xls';
+    rdo2 exportfile(ftxls(), "", fileName, bestStocks);
 end;
