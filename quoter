@@ -25,6 +25,11 @@ Begin
     
     // 计算强势个股
     bestStocks := selectBestStocks(beginDate, arrBk, topNum);
+    
+    // 按涨幅排序
+    sortTableByField(bestStocks, '涨幅', 0);
+    
+    bestStocks := select distinct * from bestStocks end;
 
     storeStock(bestStocks);
 End;
