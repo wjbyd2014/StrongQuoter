@@ -44,7 +44,6 @@ Begin
     ret := array();
     bkNum := length(arrBk);
     for i := 0 to bkNum - 1 do
-    //for i := 426 to 426 do
     begin
         bkInfo := arrBk[i];
         ret[i]['板块类型'] := bkInfo['bkType'];
@@ -71,9 +70,9 @@ Begin
             stkClose := spec(close(), stkCode);
             stkClose3 := spec(ref(close(), 3), stkCode);
             
-            incRate := 1.2;
+            incRate := 1.18;
             if stkCode[1:2] = '68' or stkCode[1] = '3' then
-                incRate := 1.3;
+                incRate := 1.25;
 
             if stkClose3 > 0 and stkClose >= stkClose3 * incRate then
                 ret[i]['强势股票数（三日涨幅主板 > 20%，科创板/创业板 > 30%）'] += 1;
@@ -166,6 +165,11 @@ End;
 
 Function parseFile(stockFileList, fileNum);
 begin
+    skips := array('融资融券', '预盈预增', '富时罗素', '创业板综', '标准普尔',
+        '机构重仓', '深股通', '预亏预减', '沪股通', 'MSCI中国', '中证500',
+        '深成500', '上证380', 'HS300_', 'QFII重仓', '上证180_', '深证100R',
+        'B股', '央视50_', '上证50_');
+        
     retArray := array();
     for i := 0 to fileNum - 1 do
     begin
@@ -173,6 +177,9 @@ begin
         arr := str2array(fileName, '.');
         bkType := arr[0];
         bkName := arr[1];
+        
+        if bkName in skips then
+           continue;
 
         size := rdo2 filesize("", stockFileList[i]);
         retRead := rdo2 readFile(rwraw(), "", stockFileList[i], 0, size, data);
@@ -180,7 +187,7 @@ begin
             continue;
 
         stocks := str2array(data, ";");
-        retArray[i] := array('bkType':bkType, 'bkName':bkName, 'stocks': stocks);
+        retArray &= array(('bkType':bkType, 'bkName':bkName, 'stocks': stocks));
     end
     return retArray;
 End;
