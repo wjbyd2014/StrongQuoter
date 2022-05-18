@@ -13,6 +13,8 @@ Begin
     // 解析板块文件，获取板块类型，板块名，股票列表
     arrBk := parseFile(bkFileList, fileNum);
     
+    totalBestStocks := array();
+    
     for date_ := date1 to date2 do
     begin
         if not spec(isTradeDay(inttodate(date_)), 'SH000001') then
@@ -24,7 +26,7 @@ Begin
         bestBks := selectBestBks(arrBk);
     
         // 按强势股票数排序
-        sortTableByField(bestBks, '强势股票数（三日涨幅主板 > 20%，科创板/创业板 > 30%）', 0);
+        sortTableByField(bestBks, '强势股票数（三日涨幅主板 > 18%，科创板/创业板 > 25%）', 0);
 
         storeBestBk(date_, bestBks);
         
@@ -34,8 +36,12 @@ Begin
         // 按涨幅排序
         sortTableByField(bestStocks, '截至今日总涨幅', 0);
 
-        storeStock(date_, bestStocks);
+        bestStocks := procBestStock(date_, bestStocks);
+        
+        totalBestStocks &= bestStocks;
     end
+    
+    storeStock(totalBestStocks);
 End;
 
 // 计算哪些板块涨幅大的个股数量多
@@ -48,7 +54,7 @@ Begin
         bkInfo := arrBk[i];
         ret[i]['板块类型'] := bkInfo['bkType'];
         ret[i]['板块名称'] := bkInfo['bkName'];
-        ret[i]['强势股票数（三日涨幅主板 > 20%，科创板/创业板 > 30%）'] := 0;
+        ret[i]['强势股票数（三日涨幅主板 > 18%，科创板/创业板 > 25%）'] := 0;
         ret[i]['股票总数'] := 0;
         ret[i]['index'] := i;
         stocks := bkInfo['stocks'];
@@ -75,12 +81,13 @@ Begin
                 incRate := 1.25;
 
             if stkClose3 > 0 and stkClose >= stkClose3 * incRate then
-                ret[i]['强势股票数（三日涨幅主板 > 20%，科创板/创业板 > 30%）'] += 1;
+                ret[i]['强势股票数（三日涨幅主板 > 18%，科创板/创业板 > 25%）'] += 1;
         end
         
         ret[i]['强势股票占比'] := 0;
         if ret[i]['股票总数'] > 0 then
-           ret[i]['强势股票占比'] := ret[i]['强势股票数（三日涨幅主板 > 20%，科创板/创业板 > 30%）'] / ret[i]['股票总数'];
+           ret[i]['强势股票占比'] := FloatN(
+               ret[i]['强势股票数（三日涨幅主板 > 18%，科创板/创业板 > 25%）'] / ret[i]['股票总数'], 2);
     end
     return ret;
 End;
@@ -144,8 +151,30 @@ Begin
             end
             
             if close2 > 0 and close1 > close2 then
-               ret &= array(('股票名称':stkName+'('+stkCode+')', '所属板块':bkInfo['bkName'], '今日收盘价':close1, '最近一次低于5日均线的收盘价': close2,
-                '最近一次低于5日均线的日期':last_blow_avg5_date, '截至今日总涨幅':(close1-close2)/close2, '3日平均成交额（万元）':avg_amount/10000));
+            begin
+                stkClose := spec(close(), stkCode);
+                stkClose3 := spec(ref(close(), 3), stkCode);
+
+                incRate := 1.18;
+                if stkCode[1:2] = '68' or stkCode[1] = '3' then
+                    incRate := 1.25;
+                    
+                with *,array(pn_Stock():stkCode,PN_Date():inttodate(date_),pn_rate():0,pn_rateday():0) do
+                begin
+                     timeSt := StrToTime("09:24:30");
+                     timeEnd := StrToTime("09:25:00")-0.00001;
+
+                     盘口金额 := vselect  Drange(-1 to -1)
+                          floatn(["buy1"]*["bc1"]/10000,4) as "盘口金额"
+                          from tradetable datekey inttodate(date_)+timeSt to inttodate(date_)+timeEnd of DefaultStockID() end;
+                end;
+                    
+                if stkClose3 > 0 and stkClose >= stkClose3 * incRate then
+                    ret &= array(('股票名称':stkName+'('+stkCode+')', '所属板块':bkInfo['bkName'], '今日收盘价':close1, '最近一次低于5日均线的收盘价': close2,
+                        '最近一次低于5日均线的日期':last_blow_avg5_date, '截至今日总涨幅':format('%.2f', FloatN((close1-close2)/close2, 2)),
+                        '3日涨幅':format('%.2f', FloatN((stkClose-stkClose3)/stkClose3, 2)), '3日平均成交额（万元）':avg_amount/10000,
+                        '次日开盘价':spec(ref(open(),-1), stkCode), '盘口金额（万）' : 盘口金额, '触发日期':date_));
+            end
         end
     end
     return ret;
@@ -200,7 +229,13 @@ begin
     rdo2 exportfile(ftxls(), "", fileName, bestBks2);
 end;
 
-Function storeStock(date_, bestStocks);
+Function storeStock(totalBestStocks);
+begin
+    fileName := 'D:\\强势股票.xls';
+    rdo2 exportfile(ftxls(), "", fileName, totalBestStocks);
+end;
+
+Function procBestStock(date_, bestStocks);
 begin
     arr := array();
     for i := 0 to length(bestStocks) - 1 do
@@ -220,7 +255,5 @@ begin
     end
 
     bestStocks := select distinct * from bestStocks end;
-
-    fileName := 'D:\\强势股票\\' + IntToStr(date_) + '.xls';
-    rdo2 exportfile(ftxls(), "", fileName, bestStocks);
+    return bestStocks;
 end;
